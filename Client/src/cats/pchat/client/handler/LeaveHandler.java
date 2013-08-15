@@ -1,20 +1,20 @@
 package cats.pchat.client.handler;
 
 import cats.pchat.client.Client;
-import cats.pchat.core.connection.data.type.impl.LeaveData;
-import cats.pchat.core.profile.Profile;
+import cats.pchat.client.profile.ClientProfile;
+import cats.pchat.core.connection.packet.Packet;
 
 /**
- * Physical Chatroom
  * Josh
- * 27/07/13
- * 10:13 PM
+ * 14/08/13
+ * 11:46 PM
  */
-public class LeaveHandler extends AbstractHandler<LeaveData>{
+public class LeaveHandler extends AbstractHandler {
 
-    public void handle(final LeaveData data){
-        final Profile profile = Client.profiles().profile(data.value());
+    public void handle(final Packet packet){
+        final long uid = packet.get(Long.class, 0);
+        final ClientProfile profile = Client.profiles().get(uid);
         Client.profiles().remove(profile);
-        Client.profileList().update();
+        Client.profileList.remove(profile);
     }
 }

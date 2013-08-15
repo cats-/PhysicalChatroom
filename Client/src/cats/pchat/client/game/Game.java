@@ -1,88 +1,54 @@
 package cats.pchat.client.game;
 
 import cats.pchat.client.Client;
-import cats.pchat.core.connection.data.type.impl.ChangePosData;
+import cats.pchat.core.GameConstants;
+import cats.pchat.core.connection.packet.Opcodes;
+import cats.pchat.core.connection.packet.Packet;
 import java.awt.Canvas;
-import java.awt.Dimension;
+import java.awt.Color;
+import java.awt.GradientPaint;
 import java.awt.Graphics2D;
+import java.awt.Paint;
 import java.awt.Point;
 import java.awt.Toolkit;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.image.BufferStrategy;
 
 /**
- * Physical Chatroom
  * Josh
- * 27/07/13
- * 9:27 PM
+ * 14/08/13
+ * 10:32 PM
  */
-public class Game extends Canvas implements Runnable{
+public class Game extends Canvas implements GameConstants, KeyListener, Runnable, Opcodes{
 
-    private static final int SPEED = 3;
-
-    public static final int LEFT = KeyEvent.VK_LEFT,
-                            RIGHT = KeyEvent.VK_RIGHT,
-                            UP = KeyEvent.VK_UP,
-                            DOWN = KeyEvent.VK_DOWN;
+    private static final Paint BACKGROUND = new GradientPaint(0, 0, Color.WHITE, GAME_SIZE.width, GAME_SIZE.height, Color.GRAY);
 
     private static final long DELAY = 35L;
 
+    private static final int LEFT = KeyEvent.VK_LEFT;
+    private static final int RIGHT = KeyEvent.VK_RIGHT;
+    private static final int UP = KeyEvent.VK_UP;
+    private static final int DOWN = KeyEvent.VK_DOWN;
+
     private BufferStrategy strategy;
 
-    private boolean left, right, up, down;
+    private boolean left;
+    private boolean right;
+    private boolean up;
+    private boolean down;
 
     public Game(){
-        setPreferredSize(GameUtils.GAME_SIZE);
-        addKeyListener(
-                new KeyAdapter() {
-                    public void keyPressed(KeyEvent e) {
-                        switch (e.getKeyCode()) {
-                            case LEFT:
-                                right = false;
-                                left = true;
-                                break;
-                            case RIGHT:
-                                left = false;
-                                right = true;
-                                break;
-                            case UP:
-                                down = false;
-                                up = true;
-                                break;
-                            case DOWN:
-                                up = false;
-                                down = true;
-                                break;
-                            default:
-                                Client.messageArea().processKey(e);
-                                break;
-                        }
-                    }
-
-                    public void keyReleased(final KeyEvent e) {
-                        switch (e.getKeyCode()) {
-                            case LEFT:
-                                left = false;
-                                break;
-                            case RIGHT:
-                                right = false;
-                                break;
-                            case UP:
-                                up = false;
-                                break;
-                            case DOWN:
-                                down = false;
-                                break;
-                        }
-                    }
-                }
-        );
+        setPreferredSize(GAME_SIZE);
+        setMaximumSize(GAME_SIZE);
+        setMinimumSize(GAME_SIZE);
+        addKeyListener(this);
     }
 
     public void run(){
         while(true){
-            update();
+            if(Client.connected)
+                update();
             draw();
             try{
                 Thread.sleep(DELAY);
@@ -90,7 +56,32 @@ public class Game extends Canvas implements Runnable{
         }
     }
 
-    public void setup(){
+    private void update(){
+        final Point location = new Point(Client.self.location);
+        location.y += up ? -SPEED : down ? SPEED : 0;
+        location.x += left ? -SPEED : right ? SPEED : 0;
+        if(!location.equals(Client.self.location))
+            Client.send(new Packet(CHANGE_LOCATION, Client.self.uid(), location));
+    }
+
+    private void draw(){
+        final Graphics2D g = (Graphics2D) strategy.getDrawGraphics();
+        g.clearRect(0, 0, GAME_SIZE.width, GAME_SIZE.height);
+        g.setPaint(BACKGROUND);
+        g.fillRect(0, 0, GAME_SIZE.width, GAME_SIZE.height);
+        if(!Client.connected){
+            g.setColor(Color.RED);
+            g.drawString("NOT CONNECTED", 10, 10);
+            return;
+        }
+        Client.profiles().forEach(p -> p.draw(g));
+        Client.self.draw(g);
+        g.dispose();
+        Toolkit.getDefaultToolkit().sync();
+        strategy.show();
+    }
+
+    public void start(){
         createBufferStrategy(2);
         strategy = getBufferStrategy();
         final Thread t = new Thread(this);
@@ -98,23 +89,32 @@ public class Game extends Canvas implements Runnable{
         t.start();
     }
 
-    private void update(){
-        if(!up && !down && !left && !right)
-            return;
-        final Point point = new Point(Client.profile().pos().get());
-        point.x += left ? -SPEED : right ? SPEED : 0;
-        point.y += up ? -SPEED : down ? SPEED : 0;
-        Client.send(new ChangePosData(Client.uid(), point));
+    public void keyPressed(final KeyEvent e){
+        Client.inputArea.process(e);
+        final int keycode = e.getKeyCode();
+        if(keycode == LEFT)
+            right = !(left = true);
+        if(keycode == RIGHT)
+            left = !(right = true);
+        if(keycode == DOWN)
+            up = !(down = true);
+        if(keycode == UP)
+            down = !(up = true);
     }
 
-    private void draw(){
-        final Graphics2D g = (Graphics2D)strategy.getDrawGraphics();
-        final Dimension size = new Dimension(getSize().width + 100, getSize().height + 100);
-        g.clearRect(0, 0, size.width, size.height);
-        GameUtils.draw(g, Client.profile());
-        Client.profiles().forEach(p -> GameUtils.draw(g, p));
-        g.dispose();
-        Toolkit.getDefaultToolkit().sync();
-        strategy.show();
+    public void keyReleased(final KeyEvent e){
+        final int keycode = e.getKeyCode();
+        if(keycode == LEFT)
+            left = false;
+        if(keycode == RIGHT)
+            right = false;
+        if(keycode == UP)
+            up = false;
+        if(keycode == DOWN)
+            down = false;
+    }
+
+    public void keyTyped(final KeyEvent e){
+
     }
 }

@@ -1,118 +1,122 @@
 package cats.pchat.client;
 
+import cats.pchat.client.auth.AuthWindow;
 import cats.pchat.client.game.Game;
 import cats.pchat.client.handler.AbstractHandler;
 import cats.pchat.client.handler.AssignHandler;
 import cats.pchat.client.handler.ChangeColorHandler;
-import cats.pchat.client.handler.ChangeNameHandler;
-import cats.pchat.client.handler.ChangePosHandler;
+import cats.pchat.client.handler.ChangeLocationHandler;
 import cats.pchat.client.handler.JoinHandler;
 import cats.pchat.client.handler.LeaveHandler;
 import cats.pchat.client.handler.MessageHandler;
-import cats.pchat.client.message.MessageArea;
-import cats.pchat.client.profile.ProfileList;
+import cats.pchat.client.handler.PopupMessageHandler;
+import cats.pchat.client.profile.ClientProfile;
 import cats.pchat.core.Constants;
 import cats.pchat.core.connection.Connection;
-import cats.pchat.core.connection.data.Data;
-import cats.pchat.core.connection.data.Opcodes;
-import cats.pchat.core.connection.event.DataListener;
-import cats.pchat.core.profile.Profile;
+import cats.pchat.core.connection.packet.Opcodes;
+import cats.pchat.core.connection.packet.Packet;
 import cats.pchat.core.profile.Profiles;
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.WindowConstants;
 
 /**
- * Physical Chatroom
  * Josh
- * 27/07/13
- * 9:20 PM
+ * 14/08/13
+ * 9:41 PM
  */
 public class Client extends JFrame implements Constants, Opcodes{
 
-    private static final Profile PROFILE = new Profile();
-    private static final Profiles PROFILES = new Profiles();
+    public static Connection connection;
+    public static ClientProfile self;
+
+    private static final Profiles<ClientProfile> PROFILES = new Profiles<>();
+
+    public static boolean connected = false;
+
+    public static Game game;
+    public static ProfileList profileList;
+    public static MessageList messageList;
+    public static InputArea inputArea;
 
     private static final Map<Byte, AbstractHandler> HANDLERS = new HashMap<>();
 
     static{
+        HANDLERS.put(ASSIGN, new AssignHandler());
         HANDLERS.put(CHANGE_COLOR, new ChangeColorHandler());
-        HANDLERS.put(CHANGE_NAME, new ChangeNameHandler());
-        HANDLERS.put(CHANGE_POS, new ChangePosHandler());
+        HANDLERS.put(CHANGE_LOCATION, new ChangeLocationHandler());
         HANDLERS.put(JOIN, new JoinHandler());
         HANDLERS.put(LEAVE, new LeaveHandler());
         HANDLERS.put(MESSAGE, new MessageHandler());
-        HANDLERS.put(ASSIGN, new AssignHandler());
+        HANDLERS.put(POPUP_MESSAGE, new PopupMessageHandler());
     }
 
-    private static MessageArea messageArea;
-    private static ProfileList profileList;
-    private static Game game;
-
-    public Client() throws IOException{
+    public Client(){
         super(TITLE);
         setLayout(new BorderLayout());
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
         game = new Game();
 
-        messageArea = new MessageArea();
         profileList = new ProfileList();
-        profileList.setPreferredSize(new Dimension(150, getPreferredSize().height));
+        messageList = new MessageList();
 
-        final JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, messageArea, profileList);
+        inputArea = new InputArea();
+
+        final JPanel chatPanel = new JPanel(new BorderLayout());
+        chatPanel.add(messageList, BorderLayout.CENTER);
+        chatPanel.add(inputArea, BorderLayout.SOUTH);
+
+        final JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, chatPanel, profileList);
 
         add(game, BorderLayout.CENTER);
-        add(split, BorderLayout.SOUTH);
-
-        pack();
-        setVisible(true);
-
-        PROFILE.name().addListener((p, o, n) -> messageArea.name(n));
-        PROFILE.color().addListener((p, o, n) -> messageArea.color(n));
-        PROFILE.connection = new Connection(new Socket(HOST, PORT));
-        PROFILE.connection.addListener(
-                (DataListener) e -> {
-                    HANDLERS.get(e.data().opcode()).handle(e.data());
-                }
-        );
+        add(topSplit, BorderLayout.SOUTH);
     }
 
-    public static ProfileList profileList(){
-        return profileList;
-    }
-
-    public static MessageArea messageArea(){
-        return messageArea;
-    }
-
-    public static Game game(){
-        return game;
-    }
-
-    public static byte uid(){
-        return PROFILE.uid().get();
-    }
-
-    public static Profile profile(){
-        return PROFILE;
-    }
-
-    public static Profiles profiles(){
+    public static Profiles<ClientProfile> profiles(){
         return PROFILES;
     }
 
-    public static boolean send(final Data data){
-        return PROFILE.send(data);
+    public static boolean send(final Packet packet){
+        return connected && connection.send(packet);
     }
 
-    public static void main(String args[]) throws IOException {
-        new Client();
+    public void display(){
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setSize(500, 700);
+        setResizable(false);
+        setVisible(true);
+        setLocationRelativeTo(null);
+        game.start();
+    }
+
+    public void start(){
+        try{
+            connection = new Connection(new Socket(HOST, PORT));
+            connection.addConnectionListener(
+                    c -> {
+                        connected = false;
+                        connection = null;
+                        JOptionPane.showMessageDialog(null, "You have been disconnected");
+                    }
+            );
+            connection.addPacketListener((c, p) -> HANDLERS.get(p.opcode()).handle(p));
+            connected = true;
+            AuthWindow.INSTANCE.display();
+            while(AuthWindow.INSTANCE.isVisible());
+            display();
+        }catch(IOException ex){
+            JOptionPane.showMessageDialog(null, "Error connecting: " + ex.getMessage());
+        }
+    }
+
+    public static void main(String args[]){
+        new Client().start();
     }
 }

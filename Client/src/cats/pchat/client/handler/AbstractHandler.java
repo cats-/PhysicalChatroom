@@ -1,14 +1,13 @@
 package cats.pchat.client.handler;
 
-import cats.pchat.core.connection.data.Data;
+import cats.pchat.core.connection.packet.Packet;
 
 /**
- * Physical Chatroom
  * Josh
- * 27/07/13
- * 10:08 PM
+ * 14/08/13
+ * 11:26 PM
  */
-public abstract class AbstractHandler<T extends Data> {
+public abstract class AbstractHandler {
 
-    public abstract void handle(final T data);
+    public abstract void handle(final Packet packet);
 }

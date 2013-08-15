@@ -1,17 +1,16 @@
 package cats.pchat.client.handler;
 
 import cats.pchat.client.Client;
-import cats.pchat.core.connection.data.type.impl.Message;
+import cats.pchat.core.connection.packet.Packet;
 
 /**
- * Physical Chatroom
  * Josh
- * 27/07/13
- * 10:08 PM
+ * 14/08/13
+ * 11:47 PM
  */
-public class MessageHandler extends AbstractHandler<Message>{
+public class MessageHandler extends AbstractHandler{
 
-    public void handle(final Message message){
-        Client.messageArea().push(message);
+    public void handle(final Packet packet){
+        Client.messageList.append(packet);
     }
 }
