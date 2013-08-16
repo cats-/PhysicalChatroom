@@ -24,6 +24,6 @@ public class ClientProfile extends BasicProfile implements GameConstants{
         g.fillRect(location.x, location.y, PLAYER_SIZE.width, PLAYER_SIZE.height);
         g.setColor(color);
         final FontMetrics metrics = g.getFontMetrics();
-        g.drawString(name, location.x, location.y - metrics.getMaxDescent());
+        g.drawString(name, location.x + (PLAYER_SIZE.width/2) - (metrics.stringWidth(name) / 2), location.y - metrics.getMaxDescent());
     }
 }
